@@ -6,7 +6,7 @@ Create .env (listed in .gitignore) supplying the following values:
 RINKEBY_PRIVATE_KEY=
 INFURA_API_KEY=
 ```
-To run, use seed provided to https://github.com/dynamiculture/offchain-cv-dapp/bootstrap.js
+To run, use seed provided to https://github.com/Dynamiculture/offchain-cv-dapp/blob/main/bootstrap.js
 ```sh
 tsc --skipLibCheck ./snapshot.ts && SEED=<Your seed from> node ./snapshot.js
 ```
