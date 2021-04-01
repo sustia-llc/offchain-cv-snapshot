@@ -12,7 +12,7 @@ tsc --skipLibCheck ./snapshot.ts && SEED=<Your seed from> node ./snapshot.js
 ```
 TODO:
 
-- Get totalSupply and balances from contract https://rinkeby.etherscan.io/address/0x89809eFf0F1DC160830C1Ee877ba7D107cAb8E8e 
+- Get totalSupply and balances from contract https://rinkeby.etherscan.io/address/0x26129f690d76480c130383ce85cda0340eee8dee 
 created from 
 https://github.com/dynamiculture/offchain-cv-contract
 
