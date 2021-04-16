@@ -3,18 +3,16 @@
 ## Quick start
 Create .env (listed in .gitignore) supplying the following values:
 ```sh
-RINKEBY_PRIVATE_KEY=
-INFURA_API_KEY=
+SEED=<use seed provided to https://github.com/Dynamiculture/offchain-cv-dapp/blob/main/bootstrap.js>
+DNYCV_CONTRACT_ADDRESS=0x8dbbd010B0B4B215C07feF16FEa9dA4Ea8e3FfA1
 ```
 To run, use seed provided to https://github.com/Dynamiculture/offchain-cv-dapp/blob/main/bootstrap.js
 ```sh
-tsc --skipLibCheck ./snapshot.ts && SEED=<Your seed from> node ./snapshot.js
+tsc --skipLibCheck ./snapshot.ts && node ./snapshot.js
 ```
 TODO:
-
-- Get totalSupply and balances from contract https://rinkeby.etherscan.io/address/0x26129f690d76480c130383ce85cda0340eee8dee 
+- get DIDs for accounts in contract https://rinkeby.etherscan.io/address/0x8dbbd010B0B4B215C07feF16FEa9dA4Ea8e3FfA1 
 created from 
 https://github.com/dynamiculture/offchain-cv-contract
-
-- Add trigger calculation.
 - Get commitIds from IDX document.
+- Add trigger calculation.

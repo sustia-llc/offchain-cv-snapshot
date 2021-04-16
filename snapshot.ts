@@ -4,6 +4,8 @@ import { Ed25519Provider } from 'key-did-provider-ed25519'
 import * as fromString from 'uint8arrays/from-string';
 import { ConvictionState, Proposal, UserConviction } from './proposal';
 import { ethers } from "ethers";
+import ThreeIdResolver from '@ceramicnetwork/3id-did-resolver'
+import { Resolver } from 'did-resolver'
 
 // const CERAMIC_URL = 'http://localhost:7007';
 const CERAMIC_URL = 'https://ceramic-clay.3boxlabs.com';
