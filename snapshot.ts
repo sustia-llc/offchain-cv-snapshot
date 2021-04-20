@@ -1,86 +1,112 @@
 import CeramicClient from '@ceramicnetwork/http-client';
 import { IDX } from '@ceramicstudio/idx'
 import { Ed25519Provider } from 'key-did-provider-ed25519'
+import * as dotenv from 'dotenv';
+import { BigNumber } from "ethers";
 import * as fromString from 'uint8arrays/from-string';
 import { ConvictionState, Proposal, UserConviction } from './proposal';
-import { ethers } from "ethers";
-import ThreeIdResolver from '@ceramicnetwork/3id-did-resolver'
-import { Resolver } from 'did-resolver'
+import { GraphQLClient, gql } from 'graphql-request'
+
+interface AccountInfo {
+    id: string;
+    balance: number;
+    token: string;
+    did?: string;
+}
 
 // const CERAMIC_URL = 'http://localhost:7007';
 const CERAMIC_URL = 'https://ceramic-clay.3boxlabs.com';
-const contractAddress = '0x89809eFf0F1DC160830C1Ee877ba7D107cAb8E8e';
-const convictionsDefinition = 'kjzl6cwe1jw149rbubjkip4y34j0c4pltzumgdikv927aj76n323o7atuz9zvj0';
-const convictionStateDocID = 'kjzl6cwe1jw1467mi6026py1lz1756foyjf7tch7124gwnjlyt4n01qpr728fry';
-
-const memberAccount1 = '0xAcE8C3100F250ff86C89E2C140c7403798F5eCAc';
-const memberDID1 = 'did:3:kjzl6cwe1jw147xybymyglzo2sy1mbgy25odccmzpfutl4gh4ep44cqe3c9zz7n';
-const memberAccount2 = '0x509691E6e5B712a8B2e1E360C7713b911AD59C02';
-const memberDID2 = 'did:3:kjzl6cwe1jw1493awsxakgh0rubvtbgddlei7neaag21fxql9qeir37i20ab4j7';
-//TODO: Get from contract
-const totalSupply = 9001;
-const memberBal1 = 1337;
-const memberBal2 = 42;
 
 //TODO: Get DID from wallet address, memberAccount1, memberAccount2
 async function main() {
+    dotenv.config();
+    const dnycvContractAddress = process.env.DNYCV_CONTRACT_ADDRESS || '';
     const seed = fromString(process.env.SEED, 'base16');
+
+    // ceramic
     let ceramic = new CeramicClient(CERAMIC_URL);
     await ceramic.setDIDProvider(new Ed25519Provider(seed));
     const idx = new IDX({ ceramic: ceramic });
 
-    // // Load conviction documents for each member
-    const memberConvictionDoc1: UserConviction = await idx.get(convictionsDefinition, memberDID1);
-    const memberConvictionDoc2: UserConviction = await idx.get(convictionsDefinition, memberDID2);
+    // get account balances and total from contract
+    const endpoint = 'https://api.thegraph.com/subgraphs/name/dynamiculture/dnycv';
+
+    const graphQLClient = new GraphQLClient(endpoint);
+
+    const query = gql`
+        {
+        accountTokenBalances(orderBy: balance) {
+            id
+            token
+            balance
+        }
+        }
+    `;
+
+    let totalSupply = 0;
+    const tokenBits = BigNumber.from(10).pow(18);
+
+    const accounts: Array<AccountInfo> = (await graphQLClient.request(query)).accountTokenBalances;
+
+    for (const account of accounts) {
+        const amount = BigNumber.from(account.balance).div(tokenBits);
+        console.log(`balance for ${account.id} in ${account.token} : ${amount}`);
+        totalSupply += amount.toNumber();
+        // Get DID from wallet address
+        // currently failing:
+        // didResolutionMetadata: { error: 'unsupportedDidMethod' }
+        // Resolve a DID document
+        // const doc = await didResolver.resolve(`did:ethr:${account.id}`)
+
+        if (process.env.MEMBER1_ACCOUNT == account.id) {
+            account.did = process.env.MEMBER1_DID;
+        } else if (process.env.MEMBER2_ACCOUNT == account.id) {
+            account.did = process.env.MEMBER2_DID;
+        }
+    };
 
     let proposalconvictions = [];
-    // add all convictions from member1 doc
-    if (memberConvictionDoc1) {
-        for (let conviction of memberConvictionDoc1.convictions) {
-            const proposalallocation = conviction.allocation * memberBal1;
-            proposalconvictions.push({ proposal: conviction.proposal, totalConviction: proposalallocation, triggered: false })
-        }
-    }
-    if (memberConvictionDoc2) {
-        for (let conviction of memberConvictionDoc2.convictions) {
-            let FOUND = false;
-            let proposalallocation = conviction.allocation * memberBal2;
-            for (let proposalconviction of proposalconvictions) {
-                if (conviction.proposal == proposalconviction.proposal) {
-                    proposalconviction.totalConviction = proposalconviction.totalConviction + proposalallocation;
-                    FOUND = true;
+    let participants = [];
+
+    for (const account of accounts) {
+        if (account.did) {
+            const memberConvictionDoc: UserConviction = await idx.get(process.env.CONVICTIONSDEFINITION, account.did);
+            const memberBalance = BigNumber.from(account.balance).div(tokenBits);
+
+            participants.push({ account: account.id, balance: memberBalance, convictions: 'commitid' });
+
+            for (let conviction of memberConvictionDoc.convictions) {
+                let FOUND = false;
+                let proposalallocation = conviction.allocation * memberBalance.toNumber();
+                for (let proposalconviction of proposalconvictions) {
+                    if (conviction.proposal == proposalconviction.proposal) {
+                        proposalconviction.totalConviction += proposalallocation;
+                        FOUND = true;
+                    }
                 }
-            }
-            // if it was recently added by member2
-            if (!FOUND) {
-                proposalconvictions.push({ proposal: conviction.proposal, totalConviction: proposalallocation, triggered: false })
+                if (!FOUND) {
+                    proposalconvictions.push({ proposal: conviction.proposal, totalConviction: proposalallocation, triggered: false })
+                }
             }
         }
     }
 
     //TODO: set triggered based on threshold
-    console.log(proposalconvictions);
+    console.log(`proposal convictions: ${proposalconvictions}`);
 
-    //FIXME:
-    const memberCommitID1 = 'commitid1';
-    const memberCommitID2 = 'commitid2';
-
-    const emptyConvictionsState2 = {
-        context: 'eip155:1/erc20:' + contractAddress,
+    const convictionsState = {
+        context: 'eip155:1/erc20:' + dnycvContractAddress,
         supply: totalSupply,
         participants: [
-            {
-                "account": memberAccount1,
-                "balance": memberBal1,
-                "convictions": memberCommitID1
-            },
-            {
-                "account": memberAccount2,
-                "balance": memberBal2,
-                "convictions": memberCommitID2
-            }
+            // e.g.:
+            // {
+            //     "account": process.env.MEMBER1_ACCOUNT,
+            //     "balance": memberBal1,
+            //     "convictions": memberCommitID1
+            // },
         ],
         proposals: [
+            // e.g.:
             // {
             // proposal: "kjzl6cwe1jw148f6l3w9bdm3t9cmavjikasq1akxun9l0rsb29spklonfyrp3lf",
             // totalConviction: 234,
@@ -89,15 +115,17 @@ async function main() {
         ]
     }
 
-    emptyConvictionsState2.proposals = proposalconvictions;
+    convictionsState.participants = participants;
+    convictionsState.proposals = proposalconvictions;
 
-    const convictionsStateDoc = await ceramic.loadDocument(convictionStateDocID);
+    const convictionsStateDoc = await ceramic.loadDocument(process.env.CONVICTIONSTATEDOCID);
+    console.log('convictions state before:');
     console.log(convictionsStateDoc.content);
 
-    await convictionsStateDoc.change({ content: emptyConvictionsState2 });
-    console.log(convictionsStateDoc.content);
+    await convictionsStateDoc.change({ content: convictionsState });
 
-    console.log(convictionsStateDoc.id);
+    console.log('convictions state after:');
+    console.log(convictionsStateDoc.content);
     process.exit(0)
 }
 
