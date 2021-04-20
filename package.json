@@ -12,6 +12,7 @@
     "@ceramicnetwork/http-client": "^0.10.1",
     "@ceramicstudio/idx": "^0.9.0",
     "@ceramicstudio/idx-tools": "^0.8.0",
+    "@mapbox/node-pre-gyp": "^1.0.3",
     "3id-connect": "^1.0.0-alpha.15",
     "dids": "^2.0.0",
     "dotenv": "^8.2.0",
@@ -21,7 +22,6 @@
     "tslib": "^2.0.0"
   },
   "devDependencies": {
-    "@mapbox/node-pre-gyp": "^1.0.3",
     "@types/node": "^12.20.6",
     "typescript": "~4.2.3"
   }

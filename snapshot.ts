@@ -6,6 +6,7 @@ import { BigNumber } from "ethers";
 import * as fromString from 'uint8arrays/from-string';
 import { ConvictionState, Proposal, UserConviction } from './proposal';
 import { GraphQLClient, gql } from 'graphql-request'
+import { definitions } from './config.json'
 
 interface AccountInfo {
     id: string;
@@ -26,7 +27,7 @@ async function main() {
     // ceramic
     let ceramic = new CeramicClient(CERAMIC_URL);
     await ceramic.setDIDProvider(new Ed25519Provider(seed));
-    const idx = new IDX({ ceramic: ceramic });
+    const idx = new IDX({ ceramic: ceramic, aliases: definitions });
 
     // get account balances and total from contract
     const endpoint = 'https://api.thegraph.com/subgraphs/name/dynamiculture/dnycv';
@@ -70,22 +71,26 @@ async function main() {
 
     for (const account of accounts) {
         if (account.did) {
-            const memberConvictionDoc: UserConviction = await idx.get(process.env.CONVICTIONSDEFINITION, account.did);
+            const memberConvictionDoc: UserConviction = await idx.get("convictions", account.did);
+            console.log('memberConvictionDoc:');
+            console.log(memberConvictionDoc);
             const memberBalance = BigNumber.from(account.balance).div(tokenBits);
 
-            participants.push({ account: account.id, balance: memberBalance, convictions: 'commitid' });
+            participants.push({ account: account.id, balance: memberBalance.toNumber(), convictions: 'commitid' });
 
-            for (let conviction of memberConvictionDoc.convictions) {
-                let FOUND = false;
-                let proposalallocation = conviction.allocation * memberBalance.toNumber();
-                for (let proposalconviction of proposalconvictions) {
-                    if (conviction.proposal == proposalconviction.proposal) {
-                        proposalconviction.totalConviction += proposalallocation;
-                        FOUND = true;
+            if (memberConvictionDoc) {
+                for (let conviction of memberConvictionDoc.convictions) {
+                    let FOUND = false;
+                    let proposalallocation = conviction.allocation * memberBalance.toNumber();
+                    for (let proposalconviction of proposalconvictions) {
+                        if (conviction.proposal == proposalconviction.proposal) {
+                            proposalconviction.totalConviction += proposalallocation;
+                            FOUND = true;
+                        }
                     }
-                }
-                if (!FOUND) {
-                    proposalconvictions.push({ proposal: conviction.proposal, totalConviction: proposalallocation, triggered: false })
+                    if (!FOUND) {
+                        proposalconvictions.push({ proposal: conviction.proposal, totalConviction: proposalallocation, triggered: false })
+                    }
                 }
             }
         }
